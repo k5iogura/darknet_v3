@@ -107,18 +107,34 @@ void forward_convolutional_layer_gpu(convolutional_layer l, network net)
     int k = l.size*l.size*l.c/l.groups;
     int n = l.out_w*l.out_h;
     for(i = 0; i < l.batch; ++i){
-        for(j = 0; j < l.groups; ++j){
-            float *a = l.weights_gpu + j*l.nweights/l.groups;
-            float *b = net.workspace;
-            float *c = l.output_gpu + (i*l.groups + j)*n*m;
-            float *im = net.input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+        if(1 && l.groups > 1 && l.groups == l.c && l.groups == l.n){ // for depthwise conv forwarding
+            for(j = 0; j < l.groups; ++j){
+                float *a = l.weights_gpu + j*l.nweights/l.groups;
+                float *b = net.workspace;
+                float *c = l.output_gpu + (i*l.groups + j)*n*m;
+                float *im = net.input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
 
-            if (l.size == 1){
-                b = im;
-            } else {
-                im2col_gpu(im, l.c/l.groups, l.h, l.w, l.size, l.stride, l.pad, b);
+                if (l.size == 1){
+                    b = im;
+                } else {
+                    im2col_gpu(im, l.c/l.groups, l.h, l.w, l.size, l.stride, l.pad, b);
+                }
+                gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
             }
-            gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
+        }else{
+            for(j = 0; j < l.groups; ++j){
+                float *a = l.weights_gpu + j*l.nweights/l.groups;
+                float *b = net.workspace;
+                float *c = l.output_gpu + (i*l.groups + j)*n*m;
+                float *im = net.input_gpu + (i*l.groups + j)*l.c/l.groups*l.h*l.w;
+
+                if (l.size == 1){
+                    b = im;
+                } else {
+                    im2col_gpu(im, l.c/l.groups, l.h, l.w, l.size, l.stride, l.pad, b);
+                }
+                gemm_gpu(0,0,m,n,k,1,a,k,b,n,1,c,n);
+            }
         }
     }
 #endif
